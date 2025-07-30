@@ -21,7 +21,6 @@ class DataProcessor:
         self.config = Config()
         self.dados_cache = {}
         
-    @st.cache_data(ttl=Config.CACHE_TTL)
     def carregar_dados_completos(_self) -> Optional[Dict[str, pd.DataFrame]]:
         """
         Carrega todos os dados da planilha e separa por abas
