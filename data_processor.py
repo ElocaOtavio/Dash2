@@ -9,6 +9,7 @@ import requests
 from typing import Dict, Optional, Any
 import logging
 from config import *
+import streamlit as st
 from config import Config
 from csat_processor import CSATProcessor, processar_planilha_satisfacao
 
