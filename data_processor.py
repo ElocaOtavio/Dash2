@@ -1,0 +1,209 @@
+"""
+Processador de dados para o Dashboard Eloca
+"""
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+import os
+import requests
+from typing import Dict, Optional, Any
+import logging
+from config import *
+from csat_processor import CSATProcessor, processar_planilha_satisfacao
+
+logger = logging.getLogger(__name__)
+
+class DataProcessor:
+    """Classe para processar dados da planilha Eloca"""
+    
+    def __init__(self):
+        self.config = Config()
+        self.dados_cache = {}
+        
+    @st.cache_data(ttl=Config.CACHE_TTL)
+    def carregar_dados_completos(_self) -> Optional[Dict[str, pd.DataFrame]]:
+        """
+        Carrega todos os dados da planilha e separa por abas
+        
+        Returns:
+            Dict com DataFrames de cada aba ou None se houver erro
+        """
+        try:
+            logger.info("Iniciando carregamento de dados da API Eloca")
+            
+            # Fazer requisição para a API
+            response = requests.get(
+                _self.config.ELOCA_URL, 
+                headers=_self.config.HEADERS,
+                timeout=30
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"Erro na requisição: {response.status_code}")
+                st.error(f"Erro ao acessar dados: HTTP {response.status_code}")
+                return None
+                
+            # Ler arquivo Excel da memória
+            excel_file = BytesIO(response.content)
+            
+            # Carregar todas as abas
+            dados_abas = {}
+            
+            try:
+                # Tentar ler todas as abas especificadas
+                for aba in _self.config.ABAS_PLANILHA:
+                    try:
+                        df = pd.read_excel(excel_file, sheet_name=aba)
+                        dados_abas[aba] = df
+                        logger.info(f"Aba '{aba}' carregada com {len(df)} linhas")
+                    except Exception as e:
+                        logger.warning(f"Não foi possível carregar a aba '{aba}': {e}")
+                        # Criar DataFrame vazio se a aba não existir
+                        dados_abas[aba] = pd.DataFrame()
+                        
+            except Exception as e:
+                logger.error(f"Erro ao processar arquivo Excel: {e}")
+                st.error(f"Erro ao processar planilha: {e}")
+                return None
+                
+            logger.info(f"Dados carregados com sucesso. {len(dados_abas)} abas processadas")
+            return dados_abas
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Erro de conexão: {e}")
+            st.error(f"Erro de conexão com a API: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Erro inesperado: {e}")
+            st.error(f"Erro inesperado: {e}")
+            return None
+    
+    def obter_aba(self, nome_aba: str) -> Optional[pd.DataFrame]:
+        """
+        Obtém dados de uma aba específica
+        
+        Args:
+            nome_aba: Nome da aba a ser obtida
+            
+        Returns:
+            DataFrame da aba ou None se não encontrada
+        """
+        dados_completos = self.carregar_dados_completos()
+        if dados_completos and nome_aba in dados_completos:
+            return dados_completos[nome_aba]
+        return None
+    
+    def validar_dados_aba(self, df: pd.DataFrame, nome_aba: str) -> bool:
+        """
+        Valida se os dados de uma aba estão em formato adequado
+        
+        Args:
+            df: DataFrame a ser validado
+            nome_aba: Nome da aba para contexto
+            
+        Returns:
+            True se válido, False caso contrário
+        """
+        if df is None or df.empty:
+            logger.warning(f"Aba '{nome_aba}' está vazia ou não foi carregada")
+            return False
+            
+        # Validações específicas por tipo de aba
+        if "Metas" in nome_aba:
+            # Validar se tem colunas essenciais para metas
+            colunas_esperadas = ["meta", "realizado", "percentual"]
+            colunas_encontradas = [col for col in colunas_esperadas 
+                                 if any(col.lower() in str(c).lower() for c in df.columns)]
+            if len(colunas_encontradas) < 2:
+                logger.warning(f"Aba '{nome_aba}' não possui colunas de meta adequadas")
+                
+        elif "Resultados" in nome_aba:
+            # Validar se tem dados numéricos para resultados
+            colunas_numericas = df.select_dtypes(include=['number']).columns
+            if len(colunas_numericas) == 0:
+                logger.warning(f"Aba '{nome_aba}' não possui colunas numéricas")
+                
+        elif "Grafico" in nome_aba:
+            # Validar se tem dados adequados para gráficos
+            if len(df.columns) < 2:
+                logger.warning(f"Aba '{nome_aba}' possui poucas colunas para gráficos")
+                
+        return True
+    
+    def obter_resumo_dados(self) -> Dict[str, Dict]:
+        """
+        Obtém resumo estatístico de todas as abas
+        
+        Returns:
+            Dicionário com resumos de cada aba
+        """
+        dados_completos = self.carregar_dados_completos()
+        resumo = {}
+        
+        if dados_completos:
+            for nome_aba, df in dados_completos.items():
+                if not df.empty:
+                    resumo[nome_aba] = {
+                        "linhas": len(df),
+                        "colunas": len(df.columns),
+                        "colunas_numericas": len(df.select_dtypes(include=['number']).columns),
+                        "valores_nulos": df.isnull().sum().sum(),
+                        "memoria_mb": round(df.memory_usage(deep=True).sum() / 1024 / 1024, 2)
+                    }
+                else:
+                    resumo[nome_aba] = {
+                        "linhas": 0,
+                        "colunas": 0,
+                        "colunas_numericas": 0,
+                        "valores_nulos": 0,
+                        "memoria_mb": 0
+                    }
+                    
+        return resumo
+    
+    def limpar_cache(self):
+        """Limpa o cache de dados"""
+        st.cache_data.clear()
+        logger.info("Cache de dados limpo")
+
+
+    def load_csat_data(self, caminho_arquivo: str = None) -> Dict:
+        """
+        Carrega e processa dados de CSAT da Pesquisa de Satisfação
+        
+        Args:
+            caminho_arquivo: Caminho para arquivo de Pesquisa de Satisfação
+            
+        Returns:
+            Dicionário com dados processados de CSAT
+        """
+        if not caminho_arquivo:
+            # Usar arquivo padrão se não especificado
+            caminho_arquivo = os.path.join(os.getcwd(), 'pesquisa_satisfacao.xlsx')
+        
+        if not os.path.exists(caminho_arquivo):
+            logger.warning(f"Arquivo de Pesquisa de Satisfação não encontrado: {caminho_arquivo}")
+            return {'sucesso': False, 'erro': 'Arquivo não encontrado'}
+        
+        return processar_planilha_satisfacao(caminho_arquivo)
+    
+    def processar_dados_com_csat(self, dados_principais: Dict, dados_csat: Dict = None) -> Dict:
+        """
+        Combina dados principais com dados de CSAT processados
+        
+        Args:
+            dados_principais: Dados das 5 abas principais
+            dados_csat: Dados processados de CSAT (opcional)
+            
+        Returns:
+            Dicionário combinado com todos os dados
+        """
+        resultado = dados_principais.copy()
+        
+        if dados_csat and dados_csat.get('sucesso'):
+            resultado['CSAT'] = dados_csat['dados_processados']
+            resultado['CSAT_Metricas'] = dados_csat['metricas']
+            resultado['CSAT_Relatorio'] = dados_csat['relatorio_deduplicacao']
+        
+        return resultado
+
