@@ -9,6 +9,7 @@ import requests
 from typing import Dict, Optional, Any
 import logging
 from config import *
+from config import Config
 from csat_processor import CSATProcessor, processar_planilha_satisfacao
 
 logger = logging.getLogger(__name__)
