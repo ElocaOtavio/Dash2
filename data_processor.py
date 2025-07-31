@@ -110,14 +110,165 @@ class DataProcessor:
         if df_chamados.empty:
             return pd.DataFrame()
         
-        # Certificar-se de que 'Data de Abertura' é datetime
-        if 'Data de Abertura' in df_chamados.columns:
-            df_chamados['Data de Abertura'] = pd.to_datetime(df_chamados['Data de Abertura'], errors='coerce')
-            df_chamados = df_chamados.dropna(subset=['Data de Abertura'])
+        # Certificar-se de que \'Data de Abertura\' é datetime
+        if \'Data de Abertura\' in df_chamados.columns:
+            df_chamados[\'Data de Abertura\'] = pd.to_datetime(df_chamados[\'Data de Abertura\'], errors=\'coerce\')
+            df_chamados = df_chamados.dropna(subset=[\'Data de Abertura\'])
 
         # 1. Total Atendimentos por Analista
-        total_atendimentos = df_chamados.groupby('Analista')['Código do Chamado'].nunique().reset_index()
-        total_atendimentos.columns = ['Analista', 'Total Atendimentos']
+        total_atendimentos = df_chamados.groupby(\'Analista\')[\'Código do Chamado\'].nunique().reset_index()
+        total_atendimentos.columns = [\'Analista\', \'Total Atendimentos\']
 
-        # 2. Média Atendimento (assumindo que é por dia ou período, aqui farei por analista)
-        # Se 
+        # 2. Média Atendimento (assumindo que é por analista, se for por dia, a lógica muda)
+        # Se \'Tempo de Atendimento\' for uma coluna de tempo, converter para segundos para média
+        # Assumindo que \'Tempo de Atendimento\' é string \'HH:MM:SS\' ou similar
+        if \'Tempo de Atendimento\' in df_chamados.columns:
+            def parse_time_to_seconds(time_str):
+                if pd.isna(time_str): return np.nan
+                parts = str(time_str).split(\':\')
+                if len(parts) == 3:
+                    h, m, s = map(int, parts)
+                    return h * 3600 + m * 60 + s
+                return np.nan
+            
+            df_chamados[\'Tempo de Atendimento_seg\'] = df_chamados[\'Tempo de Atendimento\'].apply(parse_time_to_seconds)
+            media_atendimento_seg = df_chamados.groupby(\'Analista\')[\'Tempo de Atendimento_seg\'].mean().reset_index()
+            media_atendimento_seg.columns = [\'Analista\', \'Media Atendimento Segundos\']
+            
+            # Converter de volta para formato HH:MM:SS para exibição, se necessário
+            def format_seconds_to_time(seconds):
+                if pd.isna(seconds): return np.nan
+                h = int(seconds // 3600)
+                m = int((seconds % 3600) // 60)
+                s = int(seconds % 60)
+                return f\'{h:02d}:{m:02d}:{s:02d}\'
+            
+            media_atendimento_seg[\'Media Atendimento\'] = media_atendimento_seg[\'Media Atendimento Segundos\'].apply(format_seconds_to_time)
+            total_atendimentos = total_atendimentos.merge(media_atendimento_seg[[\'Analista\', \'Media Atendimento\']], on=\'Analista\', how=\'left\')
+        else:
+            total_atendimentos[\'Media Atendimento\'] = np.nan # Se a coluna não existe
+
+        # 3. CSAT Obtido por Analista (usando df_csat_processado)
+        if df_csat_processado is not None and not df_csat_processado.empty:
+            # Assumindo que df_csat_processado tem \'Analista\' e \'Atendimento - CES e CSAT - [ANALISTA] Como você avalia a qualidade do atendimento prestado pelo analista neste chamado?\'
+            col_avaliacao = "Atendimento - CES e CSAT - [ANALISTA] Como você avalia a qualidade do atendimento prestado pelo analista neste chamado?"
+            
+            # Calcular CSAT por analista
+            csat_por_analista = df_csat_processado.groupby(\'Analista\').apply(lambda x:\n                (x[col_avaliacao].astype(str).str.lower().str.startswith((\'bom\', \'ótimo\')).sum() / len(x)) * 100\n                if len(x) > 0 else 0\n            ).reset_index(name=\'CSAT Obtido\')
+            
+            total_atendimentos = total_atendimentos.merge(csat_por_analista, on=\'Analista\', how=\'left\')
+            total_atendimentos[\'CSAT Obtido\'] = total_atendimentos[\'CSAT Obtido\'].fillna(0).round(2) # Preencher NaN com 0
+        else:
+            total_atendimentos[\'CSAT Obtido\'] = 0.0
+
+        # 4. % de Respostas Obtidas (se houver uma coluna para isso ou se puder ser calculada)
+        # Assumindo que \'Total Atendimentos\' é o total de chamados e \'Total Respostas\' é o total de pesquisas respondidas
+        # Se não houver \'Total Respostas\', esta coluna será NaN
+        # Para este exemplo, vou simular um cálculo simples ou deixar como NaN
+        total_atendimentos[\'\% de Respostas Obtidas\'] = np.nan # Placeholder
+
+        # 5. TMA Obtido (se \'Tempo de Atendimento\' for o TMA)
+        # Já calculado como \'Media Atendimento\'
+        total_atendimentos[\'TMA Obtido\'] = total_atendimentos[\'Media Atendimento\']
+
+        # Adicionar colunas de Meta (fixas ou de outra fonte)
+        total_atendimentos[\'Meta CSAT\'] = 98 # Exemplo: 98%\n        total_atendimentos[\'Meta \% respostas\'] = 35 # Exemplo: 35%\n        total_atendimentos[\'Meta TMA\'] = 45 # Exemplo: 45 minutos (ou segundos, dependendo da unidade)\n
+        # Colunas \'Indicador\', \'Meta\', \'Atingido\' (do Excel original)\n        # Estas são colunas de resumo, podem ser calculadas ou adicionadas separadamente\n        # Para replicar o formato do Excel, podemos adicionar placeholders\n        total_atendimentos[\'Indicador\'] = np.nan\n        total_atendimentos[\'Meta\'] = np.nan\n        total_atendimentos[\'Atingido\'] = np.nan\n
+        return total_atendimentos
+
+    def _calcular_resultados_area1(self, df_chamados: pd.DataFrame) -> pd.DataFrame:
+        if df_chamados.empty:
+            return pd.DataFrame()
+        
+        # Exemplo: Contagem de chamados por \'Área\' ou \'Tipo de Atendimento\'
+        # Adapte as colunas conforme seu Excel
+        if \'Área\' in df_chamados.columns:
+            df_area1 = df_chamados.groupby(\'Área\')[\'Código do Chamado\'].nunique().reset_index()
+            df_area1.columns = [\'Área\', \'Total Chamados\']
+        else:
+            df_area1 = pd.DataFrame(columns=[\'Área\', \'Total Chamados\'])
+            st.warning("Coluna \'Área\' não encontrada em Relatório_Chamados para Resultados área 1.")
+        return df_area1
+
+    def _calcular_resultados_area2(self, df_chamados: pd.DataFrame) -> pd.DataFrame:
+        if df_chamados.empty:
+            return pd.DataFrame()
+        
+        # Exemplo: Contagem de chamados por \'Status\' ou \'Prioridade\'
+        if \'Status\' in df_chamados.columns:
+            df_area2 = df_chamados.groupby(\'Status\')[\'Código do Chamado\'].nunique().reset_index()
+            df_area2.columns = [\'Status\', \'Total Chamados\']
+        else:
+            df_area2 = pd.DataFrame(columns=[\'Status\', \'Total Chamados\'])
+            st.warning("Coluna \'Status\' não encontrada em Relatório_Chamados para Resultados área 2.")
+        return df_area2
+
+    def _calcular_grafico_individual_1(self, df_chamados: pd.DataFrame) -> pd.DataFrame:
+        if df_chamados.empty:
+            return pd.DataFrame()
+        
+        # Exemplo: Chamados abertos por dia/mês por analista
+        if \'Data de Abertura\' in df_chamados.columns and \'Analista\' in df_chamados.columns:
+            df_chamados[\'Data de Abertura\'] = pd.to_datetime(df_chamados[\'Data de Abertura\'], errors=\'coerce\')
+            df_grafico1 = df_chamados.groupby([df_chamados[\'Data de Abertura\'].dt.to_period(\'M\'), \'Analista\'])[\'Código do Chamado\'].nunique().unstack(fill_value=0)
+            df_grafico1.index = df_grafico1.index.astype(str) # Para Plotly
+        else:
+            df_grafico1 = pd.DataFrame()
+            st.warning("Colunas \'Data de Abertura\' ou \'Analista\' não encontradas para Gráfico-Individual_1.")
+        return df_grafico1
+
+    def _calcular_grafico_individual_2(self, df_chamados: pd.DataFrame) -> pd.DataFrame:
+        if df_chamados.empty:
+            return pd.DataFrame()
+        
+        # Exemplo: Chamados por tipo de atendimento por analista
+        if \'Tipo de Atendimento\' in df_chamados.columns and \'Analista\' in df_chamados.columns:
+            df_grafico2 = df_chamados.groupby([\'Analista\', \'Tipo de Atendimento\'])[\'Código do Chamado\'].nunique().unstack(fill_value=0)
+        else:
+            df_grafico2 = pd.DataFrame()
+            st.warning("Colunas \'Tipo de Atendimento\' ou \'Analista\' não encontradas para Gráfico-Individual_2.")
+        return df_grafico2
+
+    # --- Funções auxiliares (manter se ainda forem usadas) ---
+    def obter_aba(self, nome_aba: str) -> Optional[pd.DataFrame]:
+        # Esta função agora depende do cache em app_production.py
+        # O load_data em app_production.py já retorna todos os dados
+        # Para manter a compatibilidade com chamadas existentes:
+        dados_completos = self.carregar_dados_completos() 
+        if dados_completos and nome_aba in dados_completos:
+            return dados_completos[nome_aba]
+        return pd.DataFrame() # Retorna DataFrame vazio se não encontrar
+
+    def validar_dados_aba(self, df: pd.DataFrame, nome_aba: str) -> bool:
+        if df is None or df.empty:
+            logger.warning(f"Aba \'{nome_aba}\' está vazia ou não foi carregada")
+            return False
+        return True
+    
+    def obter_resumo_dados(self) -> Dict[str, Dict]:
+        dados_completos = self.carregar_dados_completos()
+        resumo = {}
+        
+        if dados_completos:
+            for nome_aba, df in dados_completos.items():
+                if isinstance(df, pd.DataFrame) and not df.empty:
+                    resumo[nome_aba] = {
+                        "linhas": len(df),
+                        "colunas": len(df.columns),
+                        "colunas_numericas": len(df.select_dtypes(include=["number"]).columns),
+                        "valores_nulos": df.isnull().sum().sum(),
+                        "memoria_mb": round(df.memory_usage(deep=True).sum() / 1024 / 1024, 2)
+                    }
+                else:
+                    resumo[nome_aba] = {
+                        "linhas": 0,
+                        "colunas": 0,
+                        "colunas_numericas": 0,
+                        "valores_nulos": 0,
+                        "memoria_mb": 0
+                    }
+                    
+        return resumo
+    
+    def limpar_cache(self):
+        logger.info("Solicitação de limpeza de cache. O cache será limpo na próxima execução do app_production.")
