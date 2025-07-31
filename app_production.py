@@ -1,8 +1,8 @@
 """
 Dashboard Eloca - Versão de Produção
-Sistema de Gestão de Vendas
+Sistema de Gestão de Service Desk
 
-Autor: Manus AI
+Autor: Elô
 Data: 30/07/2025
 Versão: 1.0
 """
@@ -27,7 +27,7 @@ config = Config()
 
 # Configuração da página
 st.set_page_config(
-    page_title="Dashboard Eloca - Gestão de Vendas",
+    page_title="Dashboard Eloca - Service Desk",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
