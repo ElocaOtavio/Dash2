@@ -8,6 +8,7 @@ import os
 import requests
 from typing import Dict, Optional, Any
 import logging
+from io import BytesIO
 from config import *
 import streamlit as st
 from config import Config
