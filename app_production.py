@@ -97,10 +97,12 @@ st.markdown("""
 # Inicialização do processador de dados
 @st.cache_data(ttl=config.CACHE_TTL, show_spinner=True)
 def load_data():
-    """Carrega dados com cache otimizado para produção."""
+    """
+    Carrega dados com cache otimizado para produção.
+    """
     processor = DataProcessor()
-    return processor.load_all_data()
-
+    return processor.carregar_dados_completos()
+    
 # Inicialização do gerenciador de visualizações
 @st.cache_resource
 def get_visualization_manager():
