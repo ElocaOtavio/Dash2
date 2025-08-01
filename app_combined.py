@@ -83,12 +83,11 @@ def carregar_dados_csat(url, headers):
         st.error(f"Erro ao processar dados de CSAT: {e}")
         return pd.DataFrame()
 
-# --- Carregamento dos Dados Usando Secrets ---
-URL_OPERACIONAL = st.secrets.get("ELOCA_URL")
-HEADERS_OPERACIONAL = {"DeskManager": st.secrets.get("DESKMANAGER_TOKEN")}
+# --- Carregamento dos Dados Usando Secrets (URLs fornecidas pelo usuário) ---
+URL_OPERACIONAL = "https://eloca.desk.ms/Relatorios/excel?token=bf23dbafe9633d7bc32e25562865fb97d7fe98acd2d99ccc15fe2faad6762746"
+HEADERS_OPERACIONAL = {"DeskManager": "bf23dbafe9633d7bc32e25562865fb97d7fe98acd2d99ccc15fe2faad6762746"} # Token de exemplo, usar secrets em produção
 
-URL_CSAT = st.secrets.get("CSAT_URL")
-HEADERS_CSAT = {"DeskManager": st.secrets.get("CSAT_TOKEN")}
+URL_CSAT = "https://eloca.desk.ms/PesquisaSatisfacao/exportar?t=excel&c=wrJZesKkwpzCs8K4W8KfwrzChVbCjsKNVHzDk8KXwrLDm8OIwqnDlcKRwqhawp_Ck8KHVcK-wpDChsKpwqjCmnLDj8OVwp7CqcKlwpjCqcKhw5nDhlvCn8K8woVWwo7CjVR9w4XCp8OCwrbDiMKow5TCn8KnwpnDkcKhw5_ClMOFw4XChsKgwpRYU8OAwo1bwofCnMKqwqbCrcOMw5jCmsK4w4LDl8KdwqTDh8KTwpzDhcKiwqXDh8OXwpfCg2rClFrDi8Khw5fCpsOVwoTDiMOHwrJWwqDDicKBwqPCmMKlwqzClsKqw5zCkcKlw4bDlMOXVMKVw4LCq1nDk8KZwoHDisOIwpnDhsKdwpvCncOXWsOCX8KDwqjDhcOawprChsKWw5XDlMKowqXCmMKjwp7CssOEw4nCmsKXwoPCncKPU8KDwo9lwoZ4w5nDlsOMwqjDgsKAwp7Cq8OWwq3DjsKmw4LCt8OFw5rCosKpwpfDhMOEwprCpllxwpBawoXDgmXCh8Klw4TCqMKSwrHCl8Krw5fCosOPw4fDj8Kfw5vCkcKdwpnCmFrCn8KOwoPChsOBwpJbwobChMKpw4rCp8KYwqPCoMKvwpnDhsOGwqjCqMOJw4TCocKSw4XCoVvCnsKOwoPDjMOMwqjDlMKkWcKcw4bCscKFwqLDh8KEw47Dh8KnwqvCksOVw5plwqPCmMKqwqlYw4fDhsKywoXDkMOJVMKVw4bClcKew5HClcOGw5jChcKTw57CrMK1wrPCh8Kow5fCmMOHw43DnMOVW3BTw4jDjcKowprCmFlhWsOSw5XCnsOXw4LDh8KjwqPCg2zCtMKGwqPDk8OLw4nCn8OZwp9bcsKHwp3DkcKiw4TDhcKGwpJbwpnCoMOHw5HCq8Kcwp3CoMKtwqfChcKfbMKZwpLCk2BTw4TCocKdw5PCo8OGw5jDhMKaw5DColtywpZkwofCoMOQw4jDmcOSwqhYa8KVwpFlWcKYwqvCnsKuw5LCh3PCh8K0woVgU8OGwqpbwp5Vwq_CiMKPWMOCwpTCplrCn1rCuFXCjcKGw4vDi8KrwpvCn8OXw4ZbcVnChVdkwoXDiMKow4nDiMOVwqnCocOQVHPChmPCkcKWwpNpwpdSZVrDjsKcw4zCpcOWw5TDk8KIc2djwpjClGxjWcKtwp7Cq8OKw5fCrsOVw5DChW5TwrRUZcKGwqnDisOZw4rCqMOWwqDCqMKrw4rCpcOXwpjDlMOUwobCoFvChFPCj8KDwp7CpMKYwqDCoVrCncKHwqjDmcOCw5nCncKgwo_CpcKiw5DCqcOCwqbDiMKiw5DCk8KaZsOIwqfDkmHDg8OWwobCklvCpsKWw5XDh8KiwqNZcWlkwoXDlcKew5fDh8OMwqDCksOVVHPChsKGwoPCksKFesOCwqTCmsKNw5HCrMOOwqDDkMKlw4fDi8KswqnCoMKFwptbaWdpamXCk8KcZsKYwpHCg2VmwptkbsKeZMKa"}
 
 df_operacional = carregar_dados_operacionais(URL_OPERACIONAL, HEADERS_OPERACIONAL)
 df_csat = carregar_dados_csat(URL_CSAT, HEADERS_CSAT)
@@ -186,7 +185,10 @@ if pagina_selecionada == "Resultados Área 1 (TMA, TME, TMR)":
             csat_daily["CSAT da Ferramenta"] = csat_daily["CSAT da Ferramenta"] * 100 / 5 # Normalizar para 100%
 
             fig_csat = go.Figure()
-            fig_csat.add_trace(go.Bar(x=csat_daily["Data de Criação"], y=csat_daily["CSAT_Analista"], name="CSAT do Analista", marker_color="green"))
+            fig_csat.add_trace(go.Bar(x=csat_daily["Data de Criação"], y=csat_daily["CSAT_Analista"], name="CSAT do Analista", marker_color=\
+
+
+green"))
             fig_csat.add_trace(go.Bar(x=csat_daily["Data de Criação"], y=csat_daily["CSAT da Ferramenta"], name="CSAT da Ferramenta", marker_color="darkgreen"))
             fig_csat.update_layout(
                 title="CSAT do Analista e da Ferramenta por Dia",
