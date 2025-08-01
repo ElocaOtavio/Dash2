@@ -186,10 +186,7 @@ if pagina_selecionada == "Resultados Área 1 (TMA, TME, TMR)":
             csat_daily["CSAT da Ferramenta"] = csat_daily["CSAT da Ferramenta"] * 100 / 5 # Normalizar para 100%
 
             fig_csat = go.Figure()
-            fig_csat.add_trace(go.Bar(x=csat_daily["Data de Criação"], y=csat_daily["CSAT_Analista"], name="CSAT do Analista", marker_color=\
-
-
-green"))
+            fig_csat.add_trace(go.Bar(x=csat_daily["Data de Criação"], y=csat_daily["CSAT_Analista"], name="CSAT do Analista", marker_color=\green"))
             fig_csat.add_trace(go.Bar(x=csat_daily["Data de Criação"], y=csat_daily["CSAT da Ferramenta"], name="CSAT da Ferramenta", marker_color="darkgreen"))
             fig_csat.update_layout(
                 title="CSAT do Analista e da Ferramenta por Dia",
