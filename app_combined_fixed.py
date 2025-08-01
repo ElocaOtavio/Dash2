@@ -6,6 +6,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 import os
 from datetime import datetime, timedelta
+st.write("Iniciando a execução do app_combined_fixed.py")
+print("DEBUG: App iniciado")
 
 # --- Configuração da Página ---
 st.set_page_config(
